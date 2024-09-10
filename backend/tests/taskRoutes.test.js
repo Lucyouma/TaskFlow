@@ -1,31 +1,55 @@
 const request = require('supertest');
-const app = require('../server');
+const { app, mongoose } = require('../server');
+const Task = require('../models/Task');
+const { Types } = require('mongoose');
 
 describe('Task API', () => {
-	let server;
+  let server;
+  let validTaskId;
 
-// Start the server before running the tests
-beforeAll(() => {
-	server = app.listen(3000);
-});
+  // Start the server before running the tests
+  beforeAll(async () => {
+    server = app.listen(3000);
+    validTaskId = new Types.ObjectId(); //generate object id
+    console.log(validTaskId);
+    await mongoose.connection.dropDatabase();
+  });
 
-// Close the server after all tests
-afterAll((done) => {
-	server.close(done);
-});
+  // setup test data
+  beforeEach(async () => {
+    console.log('Inserting task with ID:', validTaskId); // Debugging line
+    await Task.create({
+      _id: validTaskId,
+      description: 'Test Task',
+      status: 'pending',
+      dueDate: new Date(),
+    });
+  });
 
-// Test for getting all tasks
-it('should get all tasks', async () => {
-	const res = await request(app).get('/api/tasks');
-	expect(res.statusCode).toEqual(200);
-	expect(res.body).toBeInstanceOf(Array);
-});
+  // clean after each test
+  afterEach(async () => {
+    await Task.deleteMany({});
+  });
 
-// Test for getting a single task by ID
-it('should get a single task by ID', async () => {
-	const taskId = 'some-valid-task-id';
-	const res = await request(app).get(`/api/tasks/${taskId}`);
-	expect(res.statusCode).toEqual(200);
-	expect(res.body).toHaveProperty('_id', taskId);
-	});
+  // Close the server after all tests
+  afterAll(async () => {
+    server.close();
+    await mongoose.connection.close();
+  });
+
+  // Test for getting all tasks
+  it('should get all tasks', async () => {
+    const res = await request(app).get('/api/tasks');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBeInstanceOf(Array);
+  });
+
+  // Test for getting a single task by ID
+  it('should get a single task by ID', async () => {
+    const res = await request(app).get(`/api/tasks/${validTaskId}`);
+    console.log('body', res.body);
+    expect(res.statusCode).toBe(200);
+
+    expect(res.body).toHaveProperty('_id', validTaskId.toString());
+  });
 });
